@@ -1,0 +1,216 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Build mode'
+        type: choice
+        options: [artifact, release, latest]
+        default: artifact
+
+enable-openid-connect: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ forgejo.event_name == 'workflow_dispatch' || !contains(forgejo.event.head_commit.message, 'nobuild') }}
+
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cpio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cpio
+
+      - name: Fetch private firmware
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          set -eu
+
+          TEMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+
+          AUTH="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+
+          git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
+            clone --depth 1 \
+            https://github.com/GayCorp/initramfs-ps4-private.git \
+            "$TEMP_DIR/firmware"
+
+          test -d "$TEMP_DIR/firmware/amdgpu"
+          test -d "$TEMP_DIR/firmware/mrvl"
+
+          mkdir -p lib/firmware
+
+          cp -a "$TEMP_DIR/firmware/amdgpu" lib/firmware/
+          cp -a "$TEMP_DIR/firmware/mrvl" lib/firmware/
+
+          echo "Private firmware copied successfully."
+          du -sh lib/firmware/amdgpu lib/firmware/mrvl
+
+      - name: Make files executable
+        run: |
+          find . -path './.git' -prune -o \
+            -type f -exec chmod +x {} +
+
+      - name: Make bake.sh executable
+        run: chmod +x bake.sh
+
+      - name: Run bake.sh
+        run: ./bake.sh -production
+
+      - name: Verify archive
+        run: |
+          set -eu
+
+          test -s initramfs.cpio.gz
+
+          echo "--- Archive size ---"
+          ls -lh initramfs.cpio.gz
+
+          echo "--- Archive contents (first 20 entries) ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet | head -20
+
+          echo "--- Total entries ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet | wc -l
+
+          echo "--- Verify firmware is included ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet |
+            grep -E '^(/|\./)?lib/firmware/(amdgpu|mrvl)/'
+
+      - name: Determine release mode
+        id: mode
+        env:
+          COMMIT_MSG: ${{ forgejo.event.head_commit.message }}
+          INPUT_MODE: ${{ inputs.mode }}
+          EVENT_NAME: ${{ forgejo.event_name }}
+        run: |
+          set -eu
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            MODE="$INPUT_MODE"
+          else
+            MSG_LC="$(printf '%s' "$COMMIT_MSG" | tr '[:upper:]' '[:lower:]')"
+            if printf '%s' "$MSG_LC" | grep -q 'latest'; then
+              MODE="latest"
+            elif printf '%s' "$MSG_LC" | grep -q 'release'; then
+              MODE="release"
+            else
+              MODE="artifact"
+            fi
+          fi
+
+          echo "mode=$MODE" >> "$FORGEJO_OUTPUT"
+          echo "Build mode: $MODE"
+
+      - name: Upload build artifact
+        uses: https://data.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: initramfs-${{ forgejo.sha }}
+          path: initramfs.cpio.gz
+          retention-days: 30
+
+      - name: Compute release tag
+        id: tag
+        if: steps.mode.outputs.mode == 'release'
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          TAG="build-${SHORT_SHA}"
+
+          echo "tag=$TAG" >> "$FORGEJO_OUTPUT"
+          echo "Releasing as $TAG"
+
+      - name: Create Forgejo Release
+        if: steps.mode.outputs.mode == 'release'
+        env:
+          FORGEJO_API_URL: ${{ forgejo.api_url }}
+          FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+          RELEASE_AUDIENCE: ${{ vars.RELEASE_AUDIENCE }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          COMMIT_SHA: ${{ forgejo.sha }}
+        run: |
+          set -eu
+
+          JWT="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$RELEASE_AUDIENCE" | jq -r '.value')"
+          RELEASE_JSON="$(jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg name "Build $RELEASE_TAG" \
+            --arg body "Automated build from commit $COMMIT_SHA.\n\n**Archive:** \\`initramfs.cpio.gz\\`\n**Size:** see asset below" \
+            '{tag_name:$tag,name:$name,body:$body,draft:false,prerelease:false,make_latest:"false"}')"
+
+          RELEASE="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $JWT" \
+            -H 'Content-Type: application/json' \
+            -d "$RELEASE_JSON" \
+            "$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/releases")"
+          RELEASE_ID="$(printf '%s' "$RELEASE" | jq -r '.id')"
+          test -n "$RELEASE_ID"
+          test "$RELEASE_ID" != null
+
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $JWT" \
+            -H 'Content-Type: application/gzip' \
+            --data-binary @initramfs.cpio.gz \
+            "$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/releases/$RELEASE_ID/assets?name=initramfs.cpio.gz"
+
+      - name: Update bleeding-edge latest release
+        if: steps.mode.outputs.mode == 'latest'
+        env:
+          FORGEJO_API_URL: ${{ forgejo.api_url }}
+          FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+          RELEASE_AUDIENCE: ${{ vars.RELEASE_AUDIENCE }}
+          COMMIT_SHA: ${{ forgejo.sha }}
+        run: |
+          set -eu
+
+          JWT="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$RELEASE_AUDIENCE" | jq -r '.value')"
+          API="$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY"
+          AUTH_HEADER="Authorization: Bearer $JWT"
+          RELEASE_FILE="$(mktemp)"
+          trap 'rm -f "$RELEASE_FILE"' EXIT
+          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/latest")"
+
+          if [ "$STATUS" = 404 ]; then
+            RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
+              '{tag_name:"latest",name:"Latest build (bleeding edge)",body:("Rolling release — always the newest successful build from `main`.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
+            RELEASE="$(curl --fail --silent --show-error \
+              -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+              -d "$RELEASE_JSON" "$API/releases")"
+          elif [ "$STATUS" -ge 400 ]; then
+            cat "$RELEASE_FILE"
+            exit 1
+          else
+            RELEASE="$(cat "$RELEASE_FILE")"
+            RELEASE_ID="$(printf '%s' "$RELEASE" | jq -r '.id')"
+            RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
+              '{name:"Latest build (bleeding edge)",body:("Rolling release — always the newest successful build from `main`.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
+            curl --fail --silent --show-error -X PATCH \
+              -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+              -d "$RELEASE_JSON" "$API/releases/$RELEASE_ID" >/dev/null
+
+            printf '%s' "$RELEASE" | jq -r '.assets[]?.id' | while IFS= read -r ASSET_ID; do
+              curl --fail --silent --show-error -X DELETE \
+                -H "$AUTH_HEADER" "$API/releases/$RELEASE_ID/assets/$ASSET_ID"
+            done
+          fi
+
+          RELEASE_ID="$(printf '%s' "$RELEASE" | jq -r '.id')"
+          test -n "$RELEASE_ID"
+          test "$RELEASE_ID" != null
+
+          curl --fail --silent --show-error \
+            -H "$AUTH_HEADER" -H 'Content-Type: application/gzip' \
+            --data-binary @initramfs.cpio.gz \
+            "$API/releases/$RELEASE_ID/assets?name=initramfs.cpio.gz"
