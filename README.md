@@ -23,12 +23,16 @@ options for initramfs in bootargs.txt:
 
 `debug` - enables on-screen kernel logging
 
+`setupnet` - auto set up net on boot
+
+`noboot` - prevents auto booting into system
+
 format:
 
 `initramfs=option1,option2,etc...`
 
 for example
 
-`initramfs=quiet,debug`
+`initramfs=quiet,debug,setupnet,noboot`
 
-this will enable no output and on screen kernel logging
+this will enable no output, on screen kernel logging, automatic internet setup, and no automatic boot

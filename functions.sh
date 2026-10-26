@@ -68,6 +68,7 @@ SetupNetwork() {
 		[ -e "${device}" ] || continue
 		interface="${device##*/}"
 		[ "${interface}" = 'lo' ] && continue
+		[ -e "${device}/device" ] || continue
 
 		einfo "Bringing up ${interface} and requesting a DHCP lease..."
 		if ! ip link set dev "${interface}" up; then
