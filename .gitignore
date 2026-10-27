@@ -2,8 +2,8 @@
 *.img
 *.log
 *.pid
-lib/firmware/amdgpu/*
-lib/firmware/mrvl/*
-GIT_HASH
-boot.sh
-vmlinuz-linux
+rootfs/lib/firmware/amdgpu/*
+rootfs/lib/firmware/mrvl/*
+rootfs/GIT_HASH
+scripts/boot.sh
+assets/vmlinuz-linux
