@@ -34,7 +34,7 @@
 if mountpoint -q /newroot; then
     if [ -f '/rescueshell.pid' ]; then kill -9 "$(cat /rescueshell.pid)"; fi
 else
-    . /functions.sh
+    . /functions/00-core.sh
     eerror "/newroot is not a mountpoint, run find-install.sh first."
     exit 1
 fi

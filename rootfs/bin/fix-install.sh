@@ -1,5 +1,6 @@
 #!/bin/sh
-. /functions.sh
+. /functions/00-core.sh
+. /functions/40-install.sh
 if mountpoint -q /newroot; then
 	einfo "Creating folders on /newroot..."
 	ps4_prepare_newroot

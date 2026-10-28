@@ -29,7 +29,7 @@
 
 # Read password with hidden input and pass it to fifo.
 
-. /functions.sh
+. /functions/00-core.sh
 
 IFS=''
 

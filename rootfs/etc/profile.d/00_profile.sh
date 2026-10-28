@@ -30,7 +30,7 @@
 if [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]; then
 	export PS1='remote rescueshell \w \# '
 	touch /remote-rescueshell.lock
-	. /functions.sh
+	. /functions/00-core.sh
 	ewarn "The lockfile was created."
 	ewarn "In order to resume boot proces, run 'resume-boot'."
 	ewarn "Be aware that it will kill your connection which means"
