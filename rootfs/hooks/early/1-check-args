@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if has_cmdline setupnet; then
+	if ! SetupNetwork; then
+		ewarn "networking setup failed; continuing boot."
+	fi
+fi
+if has_cmdline "debug"; then
+	echo 7 > /proc/sys/kernel/printk
+fi
+if has_cmdline "quiet"; then
+	initramfs_quiet=true
+fi

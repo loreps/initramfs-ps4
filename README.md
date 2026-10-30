@@ -9,7 +9,9 @@
 6. edid fix
 
 # How to run:
-On a linux host, run `./bake.sh`, It will produce an `initramfs.cpio.gz` file. (vulkan will be broken this way, as local builds dont have firmware)
+On a Linux host, run `./scripts/bake.sh`. It produces `dist/initramfs.cpio.gz`. Local builds do not include the private firmware required for Vulkan.
+
+The source tree is split into `rootfs/` (the files packed into the initramfs), `scripts/` (host-side build and QEMU tools), `assets/` (the local kernel), and `dist/` (generated archives).
 
 The PS4 loader must add `/key/eap_hdd_key.bin` to the initramfs. The internal drive can not be opened without it.
 
@@ -23,12 +25,16 @@ options for initramfs in bootargs.txt:
 
 `debug` - enables on-screen kernel logging
 
+`setupnet` - auto set up net on boot
+
+`noboot` - prevents auto booting into system
+
 format:
 
 `initramfs=option1,option2,etc...`
 
 for example
 
-`initramfs=quiet,debug`
+`initramfs=quiet,debug,setupnet,noboot`
 
-this will enable no output and on screen kernel logging
+this will enable no output, on screen kernel logging, automatic internet setup, and no automatic boot

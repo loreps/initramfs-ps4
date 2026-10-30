@@ -1,0 +1,21 @@
+#!/bin/sh
+
+ramdisk_test_dir=/tmp/ramdisk-test
+ramdisk_test_file="${ramdisk_test_dir}/test.$$"
+ramdisk_free_kb="$(awk '/^MemFree:/ { print $2; exit }' /proc/meminfo)"
+
+case "${ramdisk_free_kb}" in
+	''|*[!0-9]*)
+		ewarn "Could not determine free memory; skipping ramdisk test."
+		;;
+	*)
+		ramdisk_test_kb=$((ramdisk_free_kb * 35 / 100))
+		if [ "${ramdisk_test_kb}" -gt 0 ] && mkdir -p "${ramdisk_test_dir}" && dd if=/dev/zero of="${ramdisk_test_file}" bs=1K count="${ramdisk_test_kb}" 2>/dev/null; then
+			einfo "Ramdisk test passed (${ramdisk_test_kb} KiB written, 35% of free memory)."
+		else
+			ewarn "Ramdisk test failed while writing ${ramdisk_test_kb} KiB (35% of free memory)."
+		fi
+		rm -f "${ramdisk_test_file}"
+		rmdir "${ramdisk_test_dir}" 2>/dev/null || true
+		;;
+esac

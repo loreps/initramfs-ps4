@@ -27,15 +27,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE
 
-# A small script to resume boot process.
-# Kill regular rescueshell (which is exected on error OR forced via 'rescueshell' boot option'
-# And remove /remote-rescueshell.lock what is executed when you login over ssh in the sshd_wait period
+for functions_module in /functions/*.sh; do
+	[ -f "${functions_module}" ] || continue
+	. "${functions_module}"
+done
+unset functions_module
 
-if mountpoint -q /newroot; then
-    if [ -f '/rescueshell.pid' ]; then kill -9 "$(cat /rescueshell.pid)"; fi
-else
-    . /functions.sh
-    eerror "/newroot is not a mountpoint, run find-install.sh first."
-    exit 1
-fi
-#if [ -f '/remote-rescueshell.lock' ]; then rm '/remote-rescueshell.lock'; fi
+# vim: noexpandtab

@@ -1,8 +1,9 @@
 #!/bin/sh
 
-. /functions.sh
+. /functions/00-core.sh
+. /functions/30-ps4-hardware.sh
 SetupNetwork
-url='http://45.84.196.237:3135//ps4linux/artix.tar.xz'
+url='http://gatto.fae5.de/ps4linux/artix.tar.xz'
 distro=/ps4hdd/system/distro.tar.xz
 
 if ! ps4hdd_open; then

@@ -27,24 +27,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE
 
-if [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]; then
-	export PS1='remote rescueshell \w \# '
-	touch /remote-rescueshell.lock
-	. /functions.sh
-	ewarn "The lockfile was created."
-	ewarn "In order to resume boot proces, run 'resume-boot'."
-	ewarn "Be aware that it will kill your connection which means"
-	ewarn "you will no longer be able work in this shell."
-	echo
-	if [ -e '/luks_passfifo' ]; then
-		einfo "To remote unlock LUKS-encrypted device run 'unlock-luks'."
-		echo
-	fi
+# Read password with hidden input and pass it to fifo.
 
-else
-	export PS1='rescueshell \w \# '
-	# As the rescueshell 'pause' boot proces we will write pid into file.
-	# So we can easly kill -9 it via remote rescueshell to resume boot process.
-	# fwiw from rescueshell we can just exit to make it resume.
-	echo "$$" > /rescueshell.pid
+. /functions/00-core.sh
+
+IFS=''
+
+if ! [ -e '/luks_passfifo' ]; then
+	eerror "There is no '/luks_passfifo'."
+	exit 1
 fi
+
+printf 'Enter password: '
+stty -echo
+read luks_password
+stty echo
+printf '%s' "${luks_password}" >/luks_passfifo
+printf '\n'

@@ -1,3 +1,3 @@
 #!/bin/sh
-. /functions.sh
+. /functions/30-ps4-hardware.sh
 ps4_change_led violet_blue

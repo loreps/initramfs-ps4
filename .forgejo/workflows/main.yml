@@ -48,43 +48,38 @@ jobs:
           test -d "$TEMP_DIR/firmware/amdgpu"
           test -d "$TEMP_DIR/firmware/mrvl"
 
-          mkdir -p lib/firmware
+          mkdir -p rootfs/lib/firmware
 
-          cp -a "$TEMP_DIR/firmware/amdgpu" lib/firmware/
-          cp -a "$TEMP_DIR/firmware/mrvl" lib/firmware/
+          cp -a "$TEMP_DIR/firmware/amdgpu" rootfs/lib/firmware/
+          cp -a "$TEMP_DIR/firmware/mrvl" rootfs/lib/firmware/
 
           echo "Private firmware copied successfully."
-          du -sh lib/firmware/amdgpu lib/firmware/mrvl
-
-      - name: Make files executable
-        run: |
-          find . -path './.git' -prune -o \
-            -type f -exec chmod +x {} +
+          du -sh rootfs/lib/firmware/amdgpu rootfs/lib/firmware/mrvl
 
       - name: Make bake.sh executable
-        run: chmod +x bake.sh
+        run: chmod +x scripts/bake.sh
 
       - name: Run bake.sh
-        run: ./bake.sh -production
+        run: ./scripts/bake.sh -production
 
       - name: Verify archive
         run: |
           set -eu
 
-          test -s initramfs.cpio.gz
+          test -s dist/initramfs.cpio.gz
 
           echo "--- Archive size ---"
-          ls -lh initramfs.cpio.gz
+          ls -lh dist/initramfs.cpio.gz
 
           echo "--- Archive contents (first 20 entries) ---"
-          zcat initramfs.cpio.gz | cpio -it --quiet | head -20
+          zcat dist/initramfs.cpio.gz | cpio -it --quiet | head -20
 
           echo "--- Total entries ---"
-          zcat initramfs.cpio.gz | cpio -it --quiet | wc -l
+          zcat dist/initramfs.cpio.gz | cpio -it --quiet | wc -l
 
           echo "--- Verify firmware is included ---"
-          zcat initramfs.cpio.gz | cpio -it --quiet |
-            grep -E '^(/|\./)?lib/firmware/(amdgpu|mrvl)/'
+          zcat dist/initramfs.cpio.gz | cpio -it --quiet |
+            grep -E '^(\./)?lib/firmware/(amdgpu|mrvl)/'
 
       - name: Determine release mode
         id: mode
@@ -115,7 +110,7 @@ jobs:
         uses: https://data.forgejo.org/actions/upload-artifact@v3
         with:
           name: initramfs-${{ forgejo.sha }}
-          path: initramfs.cpio.gz
+          path: dist/initramfs.cpio.gz
           retention-days: 30
 
       - name: Compute release tag
@@ -160,7 +155,7 @@ jobs:
           curl --fail --silent --show-error \
             -H "Authorization: Bearer $JWT" \
             -H 'Content-Type: application/gzip' \
-            --data-binary @initramfs.cpio.gz \
+            --data-binary @dist/initramfs.cpio.gz \
             "$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/releases/$RELEASE_ID/assets?name=initramfs.cpio.gz"
 
       - name: Update bleeding-edge latest release
@@ -212,5 +207,5 @@ jobs:
 
           curl --fail --silent --show-error \
             -H "$AUTH_HEADER" -H 'Content-Type: application/gzip' \
-            --data-binary @initramfs.cpio.gz \
+            --data-binary @dist/initramfs.cpio.gz \
             "$API/releases/$RELEASE_ID/assets?name=initramfs.cpio.gz"
