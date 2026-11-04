@@ -1,8 +1,8 @@
-name: Build and Update Highly Unstable
+name: Build and Update Experimental
 
 on:
   push:
-    branches: [highly-unstable]
+    branches: [main]
 
 enable-openid-connect: true
 
@@ -77,11 +77,11 @@ jobs:
       - name: Upload build artifact
         uses: https://data.forgejo.org/actions/upload-artifact@v3
         with:
-          name: initramfs-highly-unstable-${{ forgejo.sha }}
+          name: initramfs-experimental-${{ forgejo.sha }}
           path: dist/initramfs.cpio.gz
           retention-days: 30
 
-      - name: Update highly-unstable prerelease
+      - name: Update experimental prerelease
         env:
           FORGEJO_API_URL: ${{ forgejo.api_url }}
           FORGEJO_REPOSITORY: ${{ forgejo.repository }}
@@ -97,10 +97,10 @@ jobs:
           AUTH_HEADER="Authorization: Bearer $JWT"
           RELEASE_FILE="$(mktemp)"
           trap 'rm -f "$RELEASE_FILE"' EXIT
-          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/highly-unstable")"
+          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/experimental-release")"
 
           RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
-            '{tag_name:"highly-unstable",name:"Highly unstable (bleeding edge)",body:("Rolling prerelease — always the newest successful build from `highly-unstable`.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:true,make_latest:"false"}')"
+            '{tag_name:"experimental-release",target_commitish:"main",name:"Experimental",body:("Automatic build of whatever is new.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:true,make_latest:"false"}')"
 
           if [ "$STATUS" = 404 ]; then
             RELEASE="$(curl --fail --silent --show-error \
