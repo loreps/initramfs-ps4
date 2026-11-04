@@ -1,14 +1,14 @@
-name: Build and Release
+name: Build and Release LTS
 
 on:
   push:
-    branches: [main]
+    branches: [lts]
   workflow_dispatch:
     inputs:
       mode:
         description: 'Build mode'
         type: choice
-        options: [artifact, release, latest]
+        options: [artifact, release, lts]
         default: artifact
 
 enable-openid-connect: true
@@ -94,8 +94,8 @@ jobs:
             MODE="$INPUT_MODE"
           else
             MSG_LC="$(printf '%s' "$COMMIT_MSG" | tr '[:upper:]' '[:lower:]')"
-            if printf '%s' "$MSG_LC" | grep -q 'latest'; then
-              MODE="latest"
+            if printf '%s' "$MSG_LC" | grep -Eq 'lts|latest'; then
+              MODE="lts"
             elif printf '%s' "$MSG_LC" | grep -q 'release'; then
               MODE="release"
             else
@@ -109,7 +109,7 @@ jobs:
       - name: Upload build artifact
         uses: https://data.forgejo.org/actions/upload-artifact@v3
         with:
-          name: initramfs-${{ forgejo.sha }}
+          name: initramfs-lts-${{ forgejo.sha }}
           path: dist/initramfs.cpio.gz
           retention-days: 30
 
@@ -158,8 +158,8 @@ jobs:
             --data-binary @dist/initramfs.cpio.gz \
             "$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/releases/$RELEASE_ID/assets?name=initramfs.cpio.gz"
 
-      - name: Update bleeding-edge latest release
-        if: steps.mode.outputs.mode == 'latest'
+      - name: Update LTS release
+        if: steps.mode.outputs.mode == 'lts'
         env:
           FORGEJO_API_URL: ${{ forgejo.api_url }}
           FORGEJO_REPOSITORY: ${{ forgejo.repository }}
@@ -179,7 +179,7 @@ jobs:
 
           if [ "$STATUS" = 404 ]; then
             RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
-              '{tag_name:"latest",name:"Latest build (bleeding edge)",body:("Rolling release — always the newest successful build from `main`.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
+              '{tag_name:"latest",target_commitish:"lts",name:"LTS",body:("Stable build intended to stay unchanged for a while.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
             RELEASE="$(curl --fail --silent --show-error \
               -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
               -d "$RELEASE_JSON" "$API/releases")"
@@ -190,7 +190,7 @@ jobs:
             RELEASE="$(cat "$RELEASE_FILE")"
             RELEASE_ID="$(printf '%s' "$RELEASE" | jq -r '.id')"
             RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
-              '{name:"Latest build (bleeding edge)",body:("Rolling release — always the newest successful build from `main`.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
+              '{name:"LTS",body:("Stable build intended to stay unchanged for a while.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
             curl --fail --silent --show-error -X PATCH \
               -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
               -d "$RELEASE_JSON" "$API/releases/$RELEASE_ID" >/dev/null
