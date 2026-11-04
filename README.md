@@ -2,10 +2,10 @@
  Custom Initramfs for PS4. (based on better-initramfs)
 # Features:
 1. internal and external in one
-2. fixed automatic script
-3. auto eject disc (incase it breaks internal)
-4. has ext4 formatting capability
-5. uses distro.tar.xz instead of psxitarch.tar.xz
+2. ~~fixed automatic script~~
+3. ~~auto eject disc (incase it breaks internal)~~
+4. ~~has ext4 formatting capability~~
+5. ~~uses distro.tar.xz instead of psxitarch.tar.xz~~
 6. edid fix
 
 # How to run:
@@ -25,9 +25,9 @@ options for initramfs in bootargs.txt:
 
 `debug` - enables on-screen kernel logging
 
-`setupnet` - auto set up net on boot
+~~`setupnet` - auto set up net on boot~~
 
-`noboot` - prevents auto booting into system
+~~`noboot` - prevents auto booting into system~~
 
 format:
 

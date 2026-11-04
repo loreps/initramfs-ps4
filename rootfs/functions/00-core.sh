@@ -21,11 +21,6 @@ eerror() {
 	echo -ne "\033[1;30m>\033[0;31m>\033[1;31m> ${*}\033[0m\n" >&2
 }
 
-eask() {
-	quiet_mode && return 0
-	echo -ne "\033[1;30m>\033[0;35m>\033[1;35m> \033[0m${*}"
-}
-
 die() {
 	eerror "$*"
 	rescueshell
@@ -34,37 +29,6 @@ die() {
 InitializeBusybox() {
 	einfo "Create all the symlinks to /bin/busybox."
 	run /bin/busybox --install -s
-}
-
-SetupNetwork() {
-	if ! command -v ip >/dev/null 2>&1 || ! command -v udhcpc >/dev/null 2>&1; then
-		eerror "The ip command or udhcpc is not available."
-		return 1
-	fi
-	if ! [ -x /bin/udhcpc.script ]; then
-		eerror "The DHCP configuration script /bin/udhcpc.script is missing."
-		return 1
-	fi
-
-	for device in /sys/class/net/*; do
-		[ -e "${device}" ] || continue
-		interface="${device##*/}"
-		[ "${interface}" = 'lo' ] && continue
-		[ -e "${device}/device" ] || continue
-
-		einfo "Bringing up ${interface} and requesting a DHCP lease..."
-		if ! ip link set dev "${interface}" up; then
-			ewarn "Could not bring up ${interface}."
-			continue
-		fi
-		if udhcpc -i "${interface}" -s /bin/udhcpc.script -n -q -t 5 -T 3; then
-			einfo "Network configured on ${interface}."
-			return 0
-		fi
-	done
-
-	eerror "Could not configure a network interface with DHCP."
-	return 1
 }
 
 rescueshell() {
@@ -85,12 +49,6 @@ rescueshell() {
 		sh --login
 	fi
 	echo
-	:> /rescueshell.pid
-}
-
-was_shell() {
-	[ -f '/rescueshell.pid' ]
-	return $?
 }
 
 run() {
@@ -123,29 +81,11 @@ run_hooks() {
 process_commandline_options() {
 	for i in $(cat /proc/cmdline); do
 		case "${i}" in
-			initramfsdebug) set -x ;;
-			root\=*) root=$(get_opt "$i") ;;
 			init\=*) init=$(get_opt "$i") ;;
-			enc_root\=*) enc_root=$(get_opt "$i") ;;
-			luks) luks=true ;;
-			lvm) lvm=true ;;
-			softraid) softraid=true ;;
-			rescueshell) rescueshell=true ;;
-			swsusp) swsusp=true ;;
-			uswsusp) uswsusp=true ;;
-			tuxonice) tuxonice=true ;;
-			resume\=*) resume=$(get_opt "$i") ;;
-			rootfstype\=*) rootfstype=$(get_opt "$i") ;;
-			rootflags\=*) rootfsmountparams="-o $(get_opt "$i")" ;;
-			ro|rw) root_rw_ro=$i ;;
-			rootdelay\=*) rootdelay=$(get_opt "$i") ;;
 			console\=*)
 				console=$(get_opt "$i")
 				console="${console%,*}"
 			;;
-			mdev) mdev=true ;;
-			luks_no_discards) luks_no_discards=true ;;
-			bcache) bcache=true ;;
 		esac
 	done
 }
@@ -172,33 +112,6 @@ has_cmdline() {
 		esac
 	done
 	return 1
-}
-
-use() {
-	name="$(eval echo \$$1)"
-	if [ -n "${name}" ] && [ "${name}" != 'false' ] && [ "${name}" != '0' ]; then
-		if [ -n "$2" ]; then
-			$2
-		else
-			return 0
-		fi
-	else
-		return 1
-	fi
-}
-
-musthave() {
-	while [ -n "$1" ]; do
-		if ! use "$1"; then
-			eerror "The \"$1\" variable is empty, set to false or zero but shoudn't be."
-			local missing_variable='true'
-		fi
-		shift
-	done
-
-	if [ "${missing_variable}" = 'true' ]; then
-		rescueshell
-	fi
 }
 
 dodir() {

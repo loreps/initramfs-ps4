@@ -1,9 +1,6 @@
 #!/bin/sh
 
 # Mount management and the switch-root boot handoff.
-cleanup() {
-	was_shell && rm /rescueshell.pid
-}
 
 boot_newroot() {
 	init="${init:-/sbin/init}"
@@ -23,43 +20,13 @@ boot_newroot() {
 emount() {
 	while [ "$#" -gt 0 ]; do
 		case $1 in
-			'/newroot')
-				if mountpoint -q '/newroot'; then
-					einfo "/newroot already mounted, skipping..."
-				else
-					einfo "Mounting /newroot..."
-					musthave root
-					if [ -n "${rootfstype}" ]; then
-						local mountparams="${rootfsmountparams} -t ${rootfstype}"
-					fi
-					resolve_device root
-					run mount -o ${root_rw_ro:-ro} ${mountparams} "${root}" '/newroot'
-				fi
-			;;
-			'/newroot/usr')
-				if [ -f '/newroot/etc/fstab' ]; then
-					while read device mountpoint fstype fsflags _; do
-						if [ "${mountpoint}" = '/usr' ]; then
-							if [ -d '/newroot/usr' ]; then
-								einfo "Mounting /newroot/usr..."
-								run mount -o "${fsflags},${root_rw_ro:-ro}" -t "${fstype}" "${device}" '/newroot/usr'
-							else
-								die "/usr in fstab present but no mountpoint /newroot/usr found."
-							fi
-							break
-						fi
-					done < '/newroot/etc/fstab'
-				else
-					ewarn "No /newroot/etc/fstab present."
-					ewarn "Early mouting of /usr will not be done."
-				fi
-			;;
 			'/dev')
 				local devmountopts='nosuid,relatime,size=10240k,mode=755'
-				if grep -q 'devtmpfs' '/proc/filesystems' && ! use mdev; then
+				if grep -q 'devtmpfs' '/proc/filesystems'; then
 					einfo "Mounting /dev (devtmpfs)..."
 					run mount -t devtmpfs -o ${devmountopts} devtmpfs /dev
 				else
+					mdev_used=true
 					einfo "Mounting /dev (mdev over tmpfs)..."
 					run mount -t tmpfs -o ${devmountopts} dev /dev
 					run touch /etc/mdev.conf
@@ -100,17 +67,8 @@ moveDev() {
 	if mountpoint -q /dev/pts; then
 		umount -l /dev/pts
 	fi
-	if use mdev; then
+	if [ "${mdev_used:-false}" = 'true' ] && [ -e /proc/sys/kernel/hotplug ]; then
 		run echo '' > /proc/sys/kernel/hotplug
 	fi
 	run mount --move /dev /newroot/dev
-}
-
-rootdelay() {
-	if [ "${rootdelay}" -gt 0 2>/dev/null ]; then
-		einfo "Waiting ${rootdelay}s (rootdelay)"
-		run sleep ${rootdelay}
-	else
-		ewarn "\$rootdelay variable must be numeric and greater than zero. Skipping rootdelay."
-	fi
 }

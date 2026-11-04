@@ -1,3 +1,0 @@
-#!/bin/sh
-
-eject /dev/sr0 > /dev/null 2>&1
