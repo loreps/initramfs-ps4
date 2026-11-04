@@ -36,11 +36,7 @@ ps4_find_install() {
 			return 0
 		fi
 	fi
-	if ps4_is_southbridge "baikal"; then
-		# The internal drive is not usable on Baikal systems.
-		ewarn "External installation not found."
-		return 1
-	fi
+
 	ewarn "External installation not found, checking internal drive..."
 	if ps4hdd_open && [ -f /ps4hdd/app/linux.img ]; then
 		ps4_fsck /ps4hdd/app/linux.img
