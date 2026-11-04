@@ -97,10 +97,10 @@ jobs:
           AUTH_HEADER="Authorization: Bearer $JWT"
           RELEASE_FILE="$(mktemp)"
           trap 'rm -f "$RELEASE_FILE"' EXIT
-          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/lite")"
+          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/lite-release")"
 
           RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
-            '{tag_name:"lite",target_commitish:"lite",name:"Lite",body:("Minimal initramfs for booting only.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:true,make_latest:"false"}')"
+            '{tag_name:"lite-release",target_commitish:"lite",name:"Lite",body:("Minimal initramfs for booting only.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:true,make_latest:"false"}')"
 
           if [ "$STATUS" = 404 ]; then
             RELEASE="$(curl --fail --silent --show-error \
