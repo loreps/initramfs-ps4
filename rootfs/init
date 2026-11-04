@@ -83,10 +83,10 @@ use rootdelay rootdelay
 ps4_wait_disks 8
 echo
 
-if ! ps4_is_southbridge "baikal"; then
-	ps4hdd_open # just so its accessible from the os...
-	run_hooks ps4hdd_open
-fi
+
+ps4hdd_open # just so its accessible from the os...
+run_hooks ps4hdd_open
+
 if ! ps4_find_install && use root; then
 	emount /newroot
 fi
