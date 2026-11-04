@@ -175,11 +175,11 @@ jobs:
           AUTH_HEADER="Authorization: Bearer $JWT"
           RELEASE_FILE="$(mktemp)"
           trap 'rm -f "$RELEASE_FILE"' EXIT
-          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/latest")"
+          STATUS="$(curl --silent --show-error -o "$RELEASE_FILE" -w '%{http_code}' -H "$AUTH_HEADER" "$API/releases/tags/lts-release")"
 
           if [ "$STATUS" = 404 ]; then
             RELEASE_JSON="$(jq -n --arg commit "$COMMIT_SHA" \
-              '{tag_name:"latest",target_commitish:"lts",name:"LTS",body:("Stable build intended to stay unchanged for a while.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
+              '{tag_name:"lts-release",target_commitish:"lts",name:"LTS",body:("Stable build intended to stay unchanged for a while.\n\n**Commit:** " + $commit + "\n**Archive:** `initramfs.cpio.gz`"),draft:false,prerelease:false,make_latest:"true"}')"
             RELEASE="$(curl --fail --silent --show-error \
               -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
               -d "$RELEASE_JSON" "$API/releases")"
