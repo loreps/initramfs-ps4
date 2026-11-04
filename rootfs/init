@@ -66,10 +66,8 @@ loadkeymap
 ps4_wait_disks 8
 echo
 
-if ! ps4_is_southbridge "baikal"; then
-	if ps4hdd_open; then
+if ps4hdd_open; then
 		run_hooks ps4hdd_open
-	fi
 fi
 while ! mountpoint -q /newroot; do
 	eerror "No Linux installation is mounted on /newroot."
