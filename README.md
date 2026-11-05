@@ -1,5 +1,8 @@
 # initramfs-ps4
  Custom Initramfs for PS4. (based on better-initramfs)
+
+**Notice: initramfs-ps4 will no longer officially recieve updates.**
+
 # Features:
 1. internal and external in one
 2. fixed automatic script
