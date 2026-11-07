@@ -64,6 +64,7 @@ emount /proc /sys
 echo 0 > /proc/sys/kernel/printk
 process_commandline_options
 InitializeBusybox
+. /functions/50-global-commands # make ts avaiable to the bussybox
 emount /dev
 run_hooks early
 loadkeymap

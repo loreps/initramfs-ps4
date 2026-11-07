@@ -1,5 +1,4 @@
 #!/bin/sh
-. /functions/00-core.sh
-. /functions/30-ps4-hardware.sh
-. /functions/40-install.sh
-ps4_find_install
+. /functions/50-global-commands.sh
+# will be removed in future version
+find-installs

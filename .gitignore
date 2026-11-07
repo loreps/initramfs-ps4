@@ -5,5 +5,5 @@
 rootfs/lib/firmware/amdgpu/*
 rootfs/lib/firmware/mrvl/*
 rootfs/GIT_HASH
-scripts/boot.sh
+scripts/boot*
 assets/vmlinuz-linux
