@@ -67,7 +67,7 @@ jobs:
             gh release edit "$TAG" \
               --title "$TITLE" \
               --notes "$NOTES" \
-              --prerelease \
+              --prerelease=false \
               --latest=false
             gh release upload "$TAG" dist/initramfs.cpio.gz --clobber
           else
@@ -75,6 +75,5 @@ jobs:
               --target "$TARGET" \
               --title "$TITLE" \
               --notes "$NOTES" \
-              --prerelease \
               --latest=false
           fi
