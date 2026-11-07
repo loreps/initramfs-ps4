@@ -14,12 +14,20 @@ boot_newroot() {
 	if ! [ -x "/newroot/${init}" ]; then
 		die "This is not bootable, you probably extracted this wrong."
 	fi
+	if ! [ -e /BOOTANYWAY ]; then
+		for i in dev sys proc run; do
+			if ! mountpoint -q "/newroot/$i"; then
+				die "/newroot/$i is not mounted. Booting would probably crash. Touch /BOOTANYWAY to skip this check."
+			fi
+		done
+	else
+		ewarn "/BOOTANYWAY found. Skipping mount checks, good luck."
+	fi
 	exec env -i \
 		TERM="${TERM:-linux}" \
 		PATH="${PATH:-/bin:/sbin:/usr/bin:/usr/sbin}" \
 		switch_root /newroot "${init}"
 }
-
 emount() {
 	while [ "$#" -gt 0 ]; do
 		case $1 in
