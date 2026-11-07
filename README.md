@@ -1,5 +1,6 @@
 # initramfs-ps4
  Custom Initramfs for PS4. (based on better-initramfs)
+
 # Features:
 1. internal and external in one
 2. fixed automatic script
@@ -9,13 +10,13 @@
 6. edid fix
 
 # How to run:
-On a Linux host, run `./scripts/bake.sh`. It produces `dist/initramfs.cpio.gz`. Local builds do not include the private firmware required for Vulkan.
+On a Linux host, run `./scripts/bake.sh`. It produces `dist/initramfs.cpio.gz`.
 
 The source tree is split into `rootfs/` (the files packed into the initramfs), `scripts/` (host-side build and QEMU tools), `assets/` (the local kernel), and `dist/` (generated archives).
 
 The PS4 loader must add `/key/eap_hdd_key.bin` to the initramfs. The internal drive can not be opened without it.
 
-...Or download from releases https://github.com/GattoDev-debug/initramfs-ps4/releases/latest
+...Or download from releases https://git.gay/GayCorp/initramfs-ps4/releases
 
 # Bootargs
 
