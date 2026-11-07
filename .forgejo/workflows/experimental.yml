@@ -22,33 +22,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cpio
 
-      - name: Fetch private firmware
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          set -eu
-
-          TEMP_DIR="$(mktemp -d)"
-          trap 'rm -rf "$TEMP_DIR"' EXIT
-
-          AUTH="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-
-          git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
-            clone --depth 1 \
-            https://github.com/GayCorp/initramfs-ps4-private.git \
-            "$TEMP_DIR/firmware"
-
-          test -d "$TEMP_DIR/firmware/amdgpu"
-          test -d "$TEMP_DIR/firmware/mrvl"
-
-          mkdir -p rootfs/lib/firmware
-
-          cp -a "$TEMP_DIR/firmware/amdgpu" rootfs/lib/firmware/
-          cp -a "$TEMP_DIR/firmware/mrvl" rootfs/lib/firmware/
-
-          echo "Private firmware copied successfully."
-          du -sh rootfs/lib/firmware/amdgpu rootfs/lib/firmware/mrvl
-
       - name: Make bake.sh executable
         run: chmod +x scripts/bake.sh
 
@@ -69,10 +42,6 @@ jobs:
 
           echo "--- Total entries ---"
           zcat dist/initramfs.cpio.gz | cpio -it --quiet | wc -l
-
-          echo "--- Verify firmware is included ---"
-          zcat dist/initramfs.cpio.gz | cpio -it --quiet |
-            grep -E '^(\./)?lib/firmware/(amdgpu|mrvl)/'
 
       - name: Upload build artifact
         uses: https://data.forgejo.org/actions/upload-artifact@v3
