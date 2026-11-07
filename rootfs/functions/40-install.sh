@@ -96,10 +96,15 @@ ps4_make_img() {
 			fi
 		;;
 		loop)
-			if ! PS4_IMG_LOOPDEV="$(losetup -f --show "${_img}")"; then
+			_dev="$(losetup -f)" || {
+				eerror "No free loop device."
+				return 1
+			}
+			if ! losetup "${_dev}" "${_img}"; then
 				eerror "Could not attach a loop device to ${_img}."
 				return 1
 			fi
+			PS4_IMG_LOOPDEV="${_dev}"
 		;;
 	esac
 }
