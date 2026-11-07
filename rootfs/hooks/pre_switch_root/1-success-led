@@ -1,5 +1,0 @@
-#!/bin/sh
-. /functions/30-ps4-hardware.sh
-sleep 2 # idk why its not changi
-ps4_change_led pink_blue
-sleep 2 # maybe its a skill issue idfk bro im not paid enough for thips4s

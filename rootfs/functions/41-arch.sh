@@ -17,16 +17,19 @@ archiso_check_kernel() {
     eerror "boot_archiso: kernel is missing:$missing"
     return 1
   fi
+  kernel_msg_lvl 7 "boot_archiso: kernel supports squashfs and overlay"
 }
 
 # try to find the internal drive this is so fucking stupid dont put me behind a keyboar
 archiso_find_internal_disk() {
   for _p in /dev/sd?27; do
     if [ -b "$_p" ]; then
+      kernel_msg_lvl 7 "boot_archiso: internal drive is ${_p%27}"
       echo "${_p%27}"
       return 0
     fi
   done
+  kernel_msg_lvl 7 "boot_archiso: no /dev/sd?27 found"
   return 1
 }
 
@@ -42,9 +45,11 @@ archiso_confirm_wipe_warning() {
     eerror "Aborted."
     return 1
   fi
+  kernel_msg "boot_archiso: wipe warning confirmed"
 }
 
 archiso_wizard_internal() {
+  kernel_msg "boot_archiso: internal install selected"
   mkdir -p /ps4hdd/app
   if ! ps4hdd_open; then
     eerror "Could not open the PS4 internal drive."
@@ -59,10 +64,12 @@ archiso_wizard_internal() {
       eerror "Aborted."
       return 1
     fi
+    kernel_msg "boot_archiso: erasing existing $ARCHISO_IMG"
     rm -f "$ARCHISO_IMG"
   fi
 
   free_gb="$(df -Pk /ps4hdd | awk 'END { print int($4 / 1048576) }')"
+  kernel_msg_lvl 7 "boot_archiso: ${free_gb} GB free on /ps4hdd"
   if [ "${free_gb}" -lt 1 ]; then
     eerror "Less than 1 GB free on the internal drive."
     return 1
@@ -90,6 +97,7 @@ archiso_wizard_internal() {
       return 1
     ;;
   esac
+  kernel_msg "boot_archiso: creating ${size} GB image, fs choice ${fs}"
 
   ps4_make_img "$ARCHISO_IMG" "$size" "$fs" loop || return 1
   einfo "Image attached as ${PS4_IMG_LOOPDEV}"
@@ -110,6 +118,7 @@ archiso_wizard() {
   if [ "$ARCHISO_TARGET" = internal ]; then
     archiso_wizard_internal || return 1
   else
+    kernel_msg "boot_archiso: external install selected"
     einfo "External install: nothing to do on this end, just choose your drive in the setup. "
   fi
 
@@ -122,28 +131,46 @@ archiso_download() {
     return 1
   fi
   mkdir -p /tmp
-  wget -O "$ARCHISO_SFS" "$ARCHISO_URL" || return 1
+  kernel_msg "boot_archiso: downloading $ARCHISO_URL"
+  if ! wget -O "$ARCHISO_SFS" "$ARCHISO_URL"; then
+    eerror "boot_archiso: download failed"
+    return 1
+  fi
+  kernel_msg "boot_archiso: download finished ($(stat -c %s "$ARCHISO_SFS" 2>/dev/null) bytes)"
 }
 
 archiso_mount_image() {
   mkdir -p "$ARCHISO_RO" "$ARCHISO_INNER"
-  mount -t squashfs -o loop,ro "$ARCHISO_SFS" "$ARCHISO_RO" || return 1
+  kernel_msg_lvl 7 "boot_archiso: mounting $ARCHISO_SFS on $ARCHISO_RO"
+  if ! mount -t squashfs -o loop,ro "$ARCHISO_SFS" "$ARCHISO_RO"; then
+    eerror "boot_archiso: could not mount the squashfs"
+    return 1
+  fi
   ARCHISO_LOWER=$ARCHISO_RO
 
   # might have another image in it, we should probably check anyway..
   if [ -f "$ARCHISO_RO/airootfs.img" ]; then
-    mount -o loop,ro "$ARCHISO_RO/airootfs.img" "$ARCHISO_INNER" || return 1
+    kernel_msg_lvl 7 "boot_archiso: nested airootfs.img found, mounting on $ARCHISO_INNER"
+    if ! mount -o loop,ro "$ARCHISO_RO/airootfs.img" "$ARCHISO_INNER"; then
+      eerror "boot_archiso: could not mount the nested airootfs.img"
+      return 1
+    fi
     ARCHISO_LOWER=$ARCHISO_INNER
   fi
+  kernel_msg "boot_archiso: lower layer is $ARCHISO_LOWER"
 }
 
 archiso_mount_overlay() {
   mkdir -p "$ARCHISO_RW" "$ARCHISO_NEWROOT"
-  mount -t tmpfs tmpfs "$ARCHISO_RW" || return 1
+  mount -t tmpfs tmpfs "$ARCHISO_RW" || { eerror "boot_archiso: tmpfs mount failed"; return 1; }
   mkdir -p "$ARCHISO_RW/up" "$ARCHISO_RW/work"
-  mount -t overlay overlay \
+  if ! mount -t overlay overlay \
     -o lowerdir="$ARCHISO_LOWER",upperdir="$ARCHISO_RW/up",workdir="$ARCHISO_RW/work" \
-    "$ARCHISO_NEWROOT" || return 1
+    "$ARCHISO_NEWROOT"; then
+    eerror "boot_archiso: overlay mount failed"
+    return 1
+  fi
+  kernel_msg "boot_archiso: overlay mounted on $ARCHISO_NEWROOT"
 }
 
 archiso_verify_newroot() {
@@ -151,6 +178,7 @@ archiso_verify_newroot() {
     eerror "boot_archiso: no /sbin/init in new root"
     return 1
   fi
+  kernel_msg_lvl 7 "boot_archiso: $ARCHISO_NEWROOT/sbin/init found"
 }
 
 archiso_ready_notice() {
@@ -168,9 +196,12 @@ archiso_ready_notice() {
 }
 
 archiso_switch_root() {
+  # /dev/kmsg disappears after moveDev, so log the milestones before it
+  kernel_msg "boot_archiso: preparing new root"
   ps4_prepare_newroot
   run_hooks after_mount_newroot
   cleanup
+  kernel_msg "boot_archiso: moving /dev and unmounting /sys /proc, switching root next"
   moveDev
   eumount /sys /proc
   run_hooks pre_switch_root
@@ -179,6 +210,7 @@ archiso_switch_root() {
 }
 
 _boot_archiso() {
+  kernel_msg "boot_archiso: starting"
   archiso_check_kernel   || return 1
   archiso_wizard         || return 1
   archiso_download       || return 1

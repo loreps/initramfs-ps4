@@ -3,6 +3,7 @@
 # Mount management and the switch-root boot handoff.
 cleanup() {
 	was_shell && rm /rescueshell.pid
+	kernel_msg_lvl 7 "cleanup done"
 }
 
 boot_newroot() {
@@ -23,6 +24,7 @@ boot_newroot() {
 	else
 		ewarn "/BOOTANYWAY found. Skipping mount checks, good luck."
 	fi
+	kernel_msg "Executing switch_root /newroot ${init}"
 	exec env -i \
 		TERM="${TERM:-linux}" \
 		PATH="${PATH:-/bin:/sbin:/usr/bin:/usr/sbin}" \
@@ -42,6 +44,7 @@ emount() {
 					fi
 					resolve_device root
 					run mount -o ${root_rw_ro:-ro} ${mountparams} "${root}" '/newroot'
+					kernel_msg "Mounted ${root} on /newroot"
 				fi
 			;;
 			'/newroot/usr')
@@ -51,6 +54,7 @@ emount() {
 							if [ -d '/newroot/usr' ]; then
 								einfo "Mounting /newroot/usr..."
 								run mount -o "${fsflags},${root_rw_ro:-ro}" -t "${fstype}" "${device}" '/newroot/usr'
+								kernel_msg "Mounted ${device} on /newroot/usr"
 							else
 								die "/usr in fstab present but no mountpoint /newroot/usr found."
 							fi
@@ -80,6 +84,7 @@ emount() {
 						run mknod '/dev/pktcdvd/control' c 10 61
 					fi
 				fi
+				kernel_msg "/dev mounted"
 			;;
 			'/proc')
 				einfo "Mounting /proc..."
@@ -104,6 +109,8 @@ eumount() {
 }
 
 moveDev() {
+	# Log first: /dev/kmsg moves away with /dev
+	kernel_msg "Moving /dev to /newroot/dev"
 	einfo "Moving /dev to /newroot/dev..."
 	if mountpoint -q /dev/pts; then
 		umount -l /dev/pts

@@ -4,12 +4,14 @@
 ps4hdd_part() {
 	for p in /dev/sd?27; do
 		if [ -b "${p}" ]; then
+			kernel_msg_lvl 7 "PS4 internal partition is ${p}"
 			echo "${p}"
 			return 0
 		fi
 	done
 	return 1
 }
+
 
 ps4_change_led() {
 	local led_base='/sys/class/leds'
@@ -31,6 +33,7 @@ ps4_change_led() {
 		fi
 	done
 	if [ -z "${target}" ]; then
+		kernel_msg_lvl 7 "LED: no ${color} status LED found"
 		return 1
 	fi
 
@@ -40,6 +43,7 @@ ps4_change_led() {
 	done
 	sleep 1
 	printf '255\n' > "${target}"
+	kernel_msg_lvl 7 "LED: set to ${color}"
 }
 
 ps4hdd_open() {
@@ -54,10 +58,11 @@ ps4hdd_open() {
 			ewarn "No PS4 internal drive found (no /dev/sd?27)."
 			return 1
 		fi
+		kernel_msg "Opening ${part} as /dev/mapper/ps4hdd"
 		if ps4_is_southbridge "aeolia"; then
-			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 create ps4hdd "${part}" || return 1
+			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 create ps4hdd "${part}" || { eerror "cryptsetup failed on ${part}."; return 1; }
 		else
-			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" || return 1
+			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" || { eerror "cryptsetup failed on ${part}."; return 1; }
 		fi
 	fi
 	mkdir -p /ps4hdd
@@ -65,6 +70,7 @@ ps4hdd_open() {
 		eerror "Could not mount /dev/mapper/ps4hdd on /ps4hdd."
 		return 1
 	fi
+	kernel_msg "Mounted /dev/mapper/ps4hdd on /ps4hdd"
 }
 
 ps4_southbridge() {
@@ -78,6 +84,7 @@ ps4_southbridge() {
 	fi
 
 	[ -n "$sb" ] || sb="Unknown Southbridge"
+	kernel_msg_lvl 7 "Southbridge detected: ${sb}"
 	printf '%s\n' "$sb"
 }
 

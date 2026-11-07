@@ -11,9 +11,11 @@ fix_install() {
 }
 # idk what the point of tihs one is lmao
 find_install() {
+  kernel_msg_lvl 7 "find_install called"
   ps4_find_install
 }
 
 boot_archiso() {
+    kernel_msg_lvl 7 "boot_archiso called"
     _boot_archiso # this oneis from 41-arch.sh
 }

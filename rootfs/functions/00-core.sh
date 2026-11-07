@@ -7,17 +7,34 @@ quiet_mode() {
 	[ "${initramfs_quiet:-false}" = 'true' ]
 }
 
+# Write to /dev/kmsg at a given kernel log level (3=err, 4=warn, 6=info, 7=debug)
+kernel_msg_lvl() {
+	if [ -w /dev/kmsg ]; then
+		_klvl="$1"
+		shift
+		printf '<%s>[initramfs-ps4]: %s\n' "${_klvl}" "$*" > /dev/kmsg
+	fi
+	return 0
+}
+
+kernel_msg() {
+	kernel_msg_lvl 6 "$*"
+}
+
 einfo() {
+	kernel_msg_lvl 6 "${*}"
 	quiet_mode && return 0
 	echo -ne "\033[1;30m>\033[0;36m>\033[1;36m> \033[0m${*}\n"
 }
 
 ewarn() {
+	kernel_msg_lvl 4 "${*}"
 	quiet_mode && return 0
 	echo -ne "\033[1;30m>\033[0;33m>\033[1;33m> \033[0m${*}\n" >&2
 }
 
 eerror() {
+	kernel_msg_lvl 3 "${*}"
 	echo -ne "\033[1;30m>\033[0;31m>\033[1;31m> ${*}\033[0m\n" >&2
 }
 
@@ -70,7 +87,6 @@ SetupNetwork() {
 rescueshell() {
 	initramfs_quiet=false
 	if [ "$rescueshell" != 'true' ]; then
-		ps4_change_led orange
 		ewarn "Dropping to rescueshell because of above error."
 	fi
 
@@ -96,6 +112,7 @@ was_shell() {
 run() {
 	if "$@"; then
 		echo "Executed: '$@'" >> /init.log
+		kernel_msg_lvl 7 "Executed: '$*'"
 	else
 		eerror "'$@' failed."
 		echo "Failed: '$@'" >> /init.log

@@ -11,6 +11,7 @@ resolve_device() {
 				eerror "Wrong UUID or LABEL."
 				rescueshell
 			fi
+			kernel_msg_lvl 7 "Resolved ${device} to $(eval echo \$$1)"
 		;;
 	esac
 }
@@ -25,6 +26,7 @@ get_majorminor() {
 	musthave major_hex minor_hex
 
 	if [ -n "${major_hex}" ] && [ -n "${minor_hex}" ]; then
+		kernel_msg_lvl 7 "${device} is major:minor 0x${major_hex}:0x${minor_hex}"
 		printf '%u:%u\n' "0x${major_hex}" "0x${minor_hex}"
 	fi
 }
@@ -57,6 +59,7 @@ InitializeLUKS() {
 		fi
 
 		run cryptsetup luksOpen --tries 25 ${cryptsetup_args} "${enc_dev}" "${dev_name}"
+		kernel_msg "LUKS: ${enc_dev} opened as ${dev_name}"
 		enc_num="$((enc_num+1))"
 	done
 }
@@ -68,6 +71,7 @@ InitializeLVM() {
 		run rm -rf '/etc/lvm/cache'
 	fi
 	run lvm vgchange -a y
+	kernel_msg "LVM: volume groups activated"
 }
 
 InitializeSoftwareRaid() {
@@ -76,11 +80,13 @@ InitializeSoftwareRaid() {
 		run mdadm --examine --scan > /etc/mdadm.conf
 	fi
 	run mdadm --assemble --scan
+	kernel_msg "RAID: arrays assembled"
 	# Software RAID arrays may themselves contain partition tables.
 	rereadpt
 }
 
 rereadpt() {
+	kernel_msg_lvl 7 "Re-reading partition tables"
 	for i in /dev/*; do
 		if [ -b "${i}" ]; then
 			blockdev --rereadpt "${i}" >/dev/null 2>&1
@@ -94,6 +100,7 @@ SwsuspResume() {
 	if [ -f '/sys/power/resume' ]; then
 		local resume_majorminor="$(get_majorminor "${resume}")"
 		musthave resume_majorminor
+		kernel_msg "swsusp: resuming from ${resume} (${resume_majorminor})"
 		echo "${resume_majorminor}" > /sys/power/resume
 	else
 		ewarn "Apparently this kernel does not support suspend."
@@ -104,6 +111,7 @@ UswsuspResume() {
 	musthave resume
 	resolve_device resume
 	if [ -f '/sys/power/resume' ]; then
+		kernel_msg "uswsusp: resuming from ${resume}"
 		run resume --resume_device "${resume}"
 	else
 		ewarn "Apparently this kernel does not support suspend."
@@ -129,9 +137,10 @@ register_bcache_devices() {
 
 	for i in $(awk '$4 !~ /^(name$|$)/ { print $4 }' /proc/partitions); do
 		if [ -e "/dev/${i}" ]; then
+			kernel_msg_lvl 7 "bcache: registering /dev/${i}"
 			echo "/dev/${i}" >/sys/fs/bcache/register_quiet
 		else
-			echo "Looks like there's no '/dev/${i}', but should be."
+			ewarn "Looks like there's no '/dev/${i}', but should be."
 		fi
 	done
 }
