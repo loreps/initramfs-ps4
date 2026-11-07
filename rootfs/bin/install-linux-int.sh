@@ -66,8 +66,7 @@ case "${fs}" in
 	;;
 esac
 
-if ! dd if=/dev/null of="${img}" bs=1048576 count=0 seek="$((size * 1024))" 2>/dev/null; then
-	eerror "Could not create ${img}."
+if ! ps4_make_img "${img}" "${size}" "${fs}" mount; then
 	exit 1
 fi
 

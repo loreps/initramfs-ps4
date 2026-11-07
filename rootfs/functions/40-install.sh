@@ -55,6 +55,55 @@ ps4_prepare_newroot() {
 	done
 }
 
+ps4_make_img() {
+	_img="$1"; _size="$2"; _fs="$3"; _mode="$4"
+	PS4_IMG_LOOPDEV=""
+
+	case "${_mode}" in
+		mount|loop) ;;
+		*)
+			eerror "ps4_make_img: mode must be 'mount' or 'loop'."
+			return 1
+		;;
+	esac
+
+	# Sparse file of the requested size
+	if ! dd if=/dev/null of="${_img}" bs=1048576 count=0 seek="$((_size * 1024))" 2>/dev/null; then
+		eerror "Could not create ${_img}."
+		return 1
+	fi
+
+	case "${_fs}" in
+		1) mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed "${_img}" ;;
+		2) mkfs.btrfs -q -f "${_img}" ;;
+		*)
+			eerror "ps4_make_img: unknown file system '${_fs}'."
+			rm -f "${_img}"
+			return 1
+		;;
+	esac
+	if [ "$?" -ne 0 ]; then
+		eerror "Could not create the file system."
+		rm -f "${_img}"
+		return 1
+	fi
+
+	case "${_mode}" in
+		mount)
+			if ! mount "${_img}" /newroot; then
+				eerror "Could not mount ${_img} on /newroot."
+				return 1
+			fi
+		;;
+		loop)
+			if ! PS4_IMG_LOOPDEV="$(losetup -f --show "${_img}")"; then
+				eerror "Could not attach a loop device to ${_img}."
+				return 1
+			fi
+		;;
+	esac
+}
+
 ps4_find_distro() {
 	local f
 	for f in distro.tar.xz distro.tar.gz distro.tar.bz2 distro.tar psxitarch.tar.xz; do
