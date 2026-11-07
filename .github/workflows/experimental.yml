@@ -1,0 +1,80 @@
+name: Build and Update Experimental
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, 'nobuild') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cpio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cpio
+
+      - name: Make bake.sh executable
+        run: chmod +x scripts/bake.sh
+
+      - name: Run bake.sh
+        run: ./scripts/bake.sh -production
+
+      - name: Verify archive
+        run: |
+          set -eu
+
+          test -s dist/initramfs.cpio.gz
+
+          echo "--- Archive size ---"
+          ls -lh dist/initramfs.cpio.gz
+
+          echo "--- Archive contents (first 20 entries) ---"
+          zcat dist/initramfs.cpio.gz | cpio -it --quiet | head -20
+
+          echo "--- Total entries ---"
+          zcat dist/initramfs.cpio.gz | cpio -it --quiet | wc -l
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: initramfs-experimental-${{ github.sha }}
+          path: dist/initramfs.cpio.gz
+          retention-days: 30
+
+      - name: Update experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          TAG: latest
+          TARGET: main
+          TITLE: Experimental
+        run: |
+          set -eu
+
+          NOTES="$(printf 'Automatic build of whatever is new.\n\n**Commit:** %s\n**Archive:** `initramfs.cpio.gz`' "$COMMIT_SHA")"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease \
+              --latest=false
+            gh release upload "$TAG" dist/initramfs.cpio.gz --clobber
+          else
+            gh release create "$TAG" dist/initramfs.cpio.gz \
+              --target "$TARGET" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease \
+              --latest=false
+          fi
