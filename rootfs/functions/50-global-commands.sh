@@ -1,6 +1,5 @@
 #!/bin/sh
-. /functions.sh
-fix-install() {
+fix_install() {
   if mountpoint -q /newroot; then
   	einfo "Creating folders on /newroot..."
   	ps4_prepare_newroot
@@ -11,7 +10,7 @@ fix-install() {
   fi
 }
 # idk what the point of tihs one is lmao
-find-install() {
+find_install() {
   ps4_find_install
 }
 

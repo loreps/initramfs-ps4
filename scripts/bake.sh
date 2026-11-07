@@ -21,10 +21,48 @@ done
 mkdir -p "${ROOT}/dist"
 rm -f "$OUT"
 
-chmod +x "${ROOTFS}/init" "${ROOTFS}"/bin/* "${ROOTFS}"/hooks/*/* "${ROOTFS}"/etc/profile.d/* 2>/dev/null || true
-git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null > "${ROOTFS}/GIT_HASH" || printf 'unknown\n' > "${ROOTFS}/GIT_HASH"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+cp -a "${ROOTFS}/." "$STAGE/"
 
-(cd "$ROOTFS" && find . -mindepth 1 -print0 \
+LIST="${STAGE}/../.symlink-candidates.$$"
+find "$STAGE" -type f -size -256c > "$LIST"
+while IFS= read -r f; do
+    [ "$(wc -l < "$f")" -le 1 ] || continue
+    target=""
+    IFS= read -r target < "$f" || true
+    [ -n "$target" ] || continue
+    case "$target" in
+        *[[:space:]]*|*[![:print:]]*) continue ;;
+    esac
+    case "$target" in
+        /*) resolved="${STAGE}${target}" ;;
+        *)  resolved="$(dirname "$f")/${target}" ;;
+    esac
+    [ -e "$resolved" ] || continue
+    rm -f "$f"
+    ln -s "$target" "$f"
+    echo "Fixed symlink: ${f#"$STAGE"/} -> ${target}"
+done < "$LIST"
+rm -f "$LIST"
+
+# Make sure /bin/sh exists even if it was missing entirely.
+if [ ! -e "${STAGE}/bin/sh" ] && [ -e "${STAGE}/bin/busybox" ]; then
+    ln -sf busybox "${STAGE}/bin/sh"
+    echo "Created missing symlink: bin/sh -> busybox"
+fi
+
+chmod +x "${STAGE}/init" "${STAGE}"/bin/* "${STAGE}"/hooks/*/* "${STAGE}"/etc/profile.d/* 2>/dev/null || true
+git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null > "${STAGE}/GIT_HASH" || printf 'unknown\n' > "${STAGE}/GIT_HASH"
+
+# Sanity check: /init needs a working interpreter, otherwise the kernel
+# panics with "Requested init /init failed (error -8)".
+if [ "$(head -c 4 "${STAGE}/bin/sh" 2>/dev/null | od -An -c | tr -d ' ')" != '177ELF' ]; then
+    echo "ERROR: bin/sh does not resolve to an ELF binary; the image would not boot." >&2
+    exit 1
+fi
+
+(cd "$STAGE" && find . -mindepth 1 -print0 \
     | LC_ALL=C sort -z \
     | cpio --null -o -H newc -R 0:0 --quiet) \
     | gzip -9 > "$OUT"
