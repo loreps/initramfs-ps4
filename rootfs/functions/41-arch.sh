@@ -196,17 +196,13 @@ archiso_ready_notice() {
 }
 
 archiso_switch_root() {
-  # /dev/kmsg disappears after moveDev, so log the milestones before it
   kernel_msg "boot_archiso: preparing new root"
   ps4_prepare_newroot
   run_hooks after_mount_newroot
-  cleanup
-  kernel_msg "boot_archiso: moving /dev and unmounting /sys /proc, switching root next"
-  moveDev
-  eumount /sys /proc
-  run_hooks pre_switch_root
 
-  exec switch_root "$ARCHISO_NEWROOT" /sbin/init
+  kernel_msg "boot_archiso: handing off to init"
+  einfo "Handing off to init..."
+  resume-boot
 }
 
 _boot_archiso() {
