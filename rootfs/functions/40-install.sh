@@ -185,7 +185,8 @@ ps4_extract() {
 	if [ "${rc}" -eq 0 ]; then
 		kernel_msg "Extraction finished"
 	else
-		eerror "Extraction failed (exit ${rc})."
+		eerror "Extraction failed (exit ${rc}) while unpacking $1 ($(stat -c %s "$1" 2>/dev/null) bytes)."
+		ewarn "The archive is corrupt or incomplete: copy $1 again and verify its size and checksum."
 	fi
 	return "${rc}"
 }
