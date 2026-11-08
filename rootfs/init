@@ -29,7 +29,6 @@
 
 # Load functions.
 . /functions.sh
-
 run_hooks init
 
 # Prepare dirs
@@ -64,7 +63,7 @@ emount /proc /sys
 echo 0 > /proc/sys/kernel/printk
 process_commandline_options
 InitializeBusybox
-. /functions/50-global-commands.sh # make ts avaiable to the bussybox
+export ENV=/functions.sh
 emount /dev
 run_hooks early
 loadkeymap
