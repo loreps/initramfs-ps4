@@ -5,11 +5,11 @@
 
 boot=/ps4hdd/system/boot
 img=/ps4hdd/app/linux.img
-mkdir -p /ps4hdd/app
-if ! ps4hdd_open; then
+if ! ps4hdd_open || ! mountpoint -q /ps4hdd; then
 	eerror "Could not open the PS4 internal drive."
 	exit 1
 fi
+mkdir -p /ps4hdd/app
 
 if [ -f "${boot}/psxitarch.tar.xz" ] && ! [ -f "${boot}/distro.tar.xz" ]; then
 	mv -f "${boot}/psxitarch.tar.xz" "${boot}/distro.tar.xz"
@@ -38,6 +38,12 @@ if [ -e "${img}" ]; then
 fi
 
 free_gb="$(df -Pk /ps4hdd | awk 'END { print int($4 / 1048576) }')"
+case "${free_gb}" in
+	''|*[!0-9]*)
+		eerror "Could not determine the free space on /ps4hdd."
+		exit 1
+	;;
+esac
 if [ "${free_gb}" -lt 1 ]; then
 	eerror "Less than 1 GB free on the internal drive."
 	exit 1
@@ -70,12 +76,17 @@ if ! ps4_make_img "${img}" "${size}" "${fs}" mount; then
 	exit 1
 fi
 
+if ! ps4_release_image "${img}"; then
+	eerror "Could not detach ${img}, it is still in use."
+	exit 1
+fi
 case "${fs}" in
-	1) mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed "${img}" ;;
-	2) mkfs.btrfs -q -f "${img}" ;;
+	1) mkfs_cmd='mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed' ;;
+	2) mkfs_cmd='mkfs.btrfs -q -f' ;;
 esac
-if [ "$?" -ne 0 ]; then
+if ! mkfs_output="$(${mkfs_cmd} "${img}" 2>&1)"; then
 	eerror "Could not create the file system."
+	[ -n "${mkfs_output}" ] && printf '%s\n' "${mkfs_output}" >&2
 	rm -f "${img}"
 	exit 1
 fi

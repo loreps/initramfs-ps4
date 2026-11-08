@@ -25,6 +25,19 @@ ps4_fsck() {
 	esac
 }
 
+ps4_release_image() {
+	# Detach loop devices still backed by the image; mkfs refuses a busy image.
+	local img="$1" loop backing failed=''
+	for loop in /dev/loop*; do
+		[ -b "${loop}" ] || continue
+		backing="$(cat "/sys/block/${loop##*/}/loop/backing_file" 2>/dev/null)"
+		[ "${backing}" = "${img}" ] || continue
+		ewarn "${loop} is still backed by ${img}, detaching it."
+		losetup -d "${loop}" || failed='true'
+	done
+	[ -z "${failed}" ] || return 1
+}
+
 ps4_find_install() {
 	if mountpoint -q /newroot && ! umount /newroot; then
 		eerror "/newroot is busy, can not search again."
