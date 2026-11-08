@@ -76,26 +76,6 @@ if ! ps4_make_img "${img}" "${size}" "${fs}" mount; then
 	exit 1
 fi
 
-if ! ps4_release_image "${img}"; then
-	eerror "Could not detach ${img}, it is still in use."
-	exit 1
-fi
-case "${fs}" in
-	1) mkfs_cmd='mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed' ;;
-	2) mkfs_cmd='mkfs.btrfs -q -f' ;;
-esac
-if ! mkfs_output="$(${mkfs_cmd} "${img}" 2>&1)"; then
-	eerror "Could not create the file system."
-	[ -n "${mkfs_output}" ] && printf '%s\n' "${mkfs_output}" >&2
-	rm -f "${img}"
-	exit 1
-fi
-
-if ! mount "${img}" /newroot; then
-	eerror "Could not mount ${img} on /newroot."
-	exit 1
-fi
-
 einfo "Extracting $(basename "${distro}"), do not turn off the PS4..."
 if ! ps4_extract "${distro}"; then
 	eerror "Distro extraction failed."
