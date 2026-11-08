@@ -25,6 +25,19 @@ ps4_fsck() {
 	esac
 }
 
+ps4_release_image() {
+	# Detach loop devices still backed by the image; mkfs refuses a busy image.
+	local img="$1" loop backing failed=''
+	for loop in /dev/loop*; do
+		[ -b "${loop}" ] || continue
+		backing="$(cat "/sys/block/${loop##*/}/loop/backing_file" 2>/dev/null)"
+		[ "${backing}" = "${img}" ] || continue
+		ewarn "${loop} is still backed by ${img}, detaching it."
+		losetup -d "${loop}" || failed='true'
+	done
+	[ -z "${failed}" ] || return 1
+}
+
 ps4_find_install() {
 	if mountpoint -q /newroot && ! umount /newroot; then
 		eerror "/newroot is busy, can not search again."
@@ -73,6 +86,13 @@ ps4_make_img() {
 		;;
 	esac
 
+	# A loop device still backed by the image makes mkfs refuse it as "mounted".
+	if ! ps4_release_image "${_img}"; then
+		eerror "${_img} is still in use, could not detach it."
+		return 1
+	fi
+	kernel_msg_lvl 7 "No loop device is backing ${_img}"
+
 	# Sparse file of the requested size
 	if ! dd if=/dev/null of="${_img}" bs=1048576 count=0 seek="$((_size * 1024))" 2>/dev/null; then
 		eerror "Could not create ${_img}."
@@ -81,16 +101,18 @@ ps4_make_img() {
 	kernel_msg_lvl 7 "Sparse file ${_img} created"
 
 	case "${_fs}" in
-		1) mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed "${_img}" ;;
-		2) mkfs.btrfs -q -f "${_img}" ;;
+		1) mkfs_cmd='mkfs.ext4 -q -F -O ^orphan_file,^metadata_csum_seed' ;;
+		2) mkfs_cmd='mkfs.btrfs -q -f' ;;
 		*)
 			eerror "ps4_make_img: unknown file system '${_fs}'."
 			rm -f "${_img}"
 			return 1
 		;;
 	esac
-	if [ "$?" -ne 0 ]; then
+	# Keep mkfs's own message: it is the only hint about why it refused.
+	if ! mkfs_output="$(${mkfs_cmd} "${_img}" 2>&1)"; then
 		eerror "Could not create the file system."
+		[ -n "${mkfs_output}" ] && printf '%s\n' "${mkfs_output}" >&2
 		rm -f "${_img}"
 		return 1
 	fi
@@ -163,7 +185,8 @@ ps4_extract() {
 	if [ "${rc}" -eq 0 ]; then
 		kernel_msg "Extraction finished"
 	else
-		eerror "Extraction failed (exit ${rc})."
+		eerror "Extraction failed (exit ${rc}) while unpacking $1 ($(stat -c %s "$1" 2>/dev/null) bytes)."
+		ewarn "The archive is corrupt or incomplete: copy $1 again and verify its size and checksum."
 	fi
 	return "${rc}"
 }
