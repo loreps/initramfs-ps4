@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# i dont understand shit
+
 source=/ps4hdd/home/linux.img
 destination=/ps4hdd/app/linux.img
 note="/ps4hdd/home/read me linux user.txt"
