@@ -13,16 +13,7 @@ ps4_wait_disks() {
 }
 
 ps4_fsck() {
-	case "$(blkid "$1" 2>/dev/null)" in
-		*'TYPE="ext'*)
-			einfo "Checking $1 ..."
-			e2fsck -p "$1"
-			if [ "$?" -ge 4 ]; then
-				ewarn "e2fsck found errors it could not fix on $1."
-				ewarn "Run 'e2fsck -f $1' by hand if the boot fails."
-			fi
-		;;
-	esac
+	ewarn " test " 
 }
 
 ps4_release_image() {
