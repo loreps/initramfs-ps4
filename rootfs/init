@@ -33,6 +33,7 @@ run_hooks init
 
 # Prepare dirs
 run dodir /dev /newroot /sbin /proc /sys /etc /var/log /var/run
+emount /proc /sys # the reason we mount a very start is so we have the southbridge banner ready, and other stuff.
 [ -d /lib ] && run ln -s /lib /lib64
 [ -d /usr/lib ] && run ln -s /usr/lib /usr/lib64
 
@@ -57,7 +58,6 @@ hash="$(cat /GIT_HASH)"
 # figure out southbridge
 sb="$(ps4_southbridge)"
 einfo "initramfs-ps4 ${ver}-git-${hash}. Linux kernel ${kernelver}. Running ${sb}.\n"
-emount /proc /sys
 
 # Disable kernel messages from popping onto the screen
 echo 0 > /proc/sys/kernel/printk
@@ -103,7 +103,8 @@ ps4_prepare_newroot
 run_hooks after_mount_newroot
 cleanup
 moveDev
-eumount /sys /proc
+moveSys
+moveProc
 run_hooks pre_switch_root
 boot_newroot
 

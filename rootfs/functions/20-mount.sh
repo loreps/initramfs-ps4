@@ -9,21 +9,14 @@ cleanup() {
 boot_newroot() {
 	init="${init:-/sbin/init}"
 	einfo "Switching root to /newroot and executing ${init}."
+
 	if ! [ -e "/newroot/${init}" ]; then
 		die "There is no executable '/newroot/${init}'."
 	fi
 	if ! [ -x "/newroot/${init}" ]; then
 		die "This is not bootable, you probably extracted this wrong."
 	fi
-	if ! [ -e /BOOTANYWAY ]; then
-		for i in dev sys proc run; do
-			if ! mountpoint -q "/newroot/$i"; then
-				die "/newroot/$i is not mounted. Booting would probably crash. Touch /BOOTANYWAY to skip this check."
-			fi
-		done
-	else
-		ewarn "/BOOTANYWAY found. Skipping mount checks, good luck."
-	fi
+
 	kernel_msg "Executing switch_root /newroot ${init}"
 	exec env -i \
 		TERM="${TERM:-linux}" \
@@ -119,6 +112,17 @@ moveDev() {
 		run echo '' > /proc/sys/kernel/hotplug
 	fi
 	run mount --move /dev /newroot/dev
+}
+moveSys() {
+	kernel_msg "Moving /sys to /newroot/sys"
+	einfo "Moving /sys to /newroot/sys..."
+	run mount --move /sys /newroot/sys
+}
+
+moveProc() {
+	kernel_msg "Moving /proc to /newroot/proc"
+	einfo "Moving /proc to /newroot/proc..."
+	run mount --move /proc /newroot/proc
 }
 
 rootdelay() {
