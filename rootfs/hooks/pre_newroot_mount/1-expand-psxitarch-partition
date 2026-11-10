@@ -1,177 +1,149 @@
 #!/bin/sh
 
-# If the booted external Linux install lives on a single-partition disk labeled
-# PSXITARCH, check whether the partition is using the full disk and offer to
-# expand it in place.
-#
-# Assumptions:
-#  - The Linux root is an ext4 filesystem on a single primary partition.
-#  - The partition is the only partition on the disk (no boot partition pair).
-#  - The disk is not currently in use for anything else.
-#
-# This is intentionally conservative: if it cannot safely determine the layout,
-# it aborts rather than guessing.
-
-# Linux partition is mounted on /newroot at this point in the hook run.
 target_dev=''
 if [ -d /newroot ] && mountpoint -q /newroot; then
-\ttarget_dev="$(findmnt -n -o SOURCE /newroot 2>/dev/null)"
+	target_dev="$(findmnt -n -o SOURCE /newroot 2>/dev/null)"
 fi
 [ -n "${target_dev}" ] || return 0
 
-# Resolve to the base disk, e.g. /dev/sda.
 diskpart="${target_dev##*/}"
 diskbase="${target_dev%[0-9]*}"
 [ -b "${diskbase}" ] || return 0
 
-# Verify the label matches PSXITARCH.
 disklabel=''
 case "$(blkid -o value -s LABEL "${target_dev}" 2>/dev/null)" in
-\t''|*[!0-9A-Za-z_\-]*) ;;
-\t*) disklabel="${_}" ;;
+	''|*[!0-9A-Za-z_\-]*) ;;
+	*) disklabel="${_}" ;;
 esac
 if [ "${disklabel}" != 'PSXITARCH' ]; then
-\treturn 0
+	return 0
 fi
 
-# Only offer this when there is exactly one partition on the disk.
 parts=''
 for p in "${diskbase}"[0-9]*; do
-\t[ -b "${p}" ] && parts="${parts} ${p}"
+	[ -b "${p}" ] && parts="${parts} ${p}"
 done
 case "${parts}" in
-\t' '*)
-\t\tewarn "This hook only handles disks with a single partition."
-\t\treturn 0
-\t;;
-\t*)
-\t\t# No partitions found at all — nothing to do.
-\t\treturn 0
-\t;;
+	' '*) ewarn "Only single-partition disks are handled here."; return 0 ;;
+	*) return 0 ;;
 esac
 
-disk_by_id=""
-case "${target_dev}" in
-\t/dev/disk/by-id/*) disk_by_id="${target_dev%/*}/../$(basename "${diskbase}")" ;;
-esac
-
-# Use raw sector counts from sysfs; 512-byte sectors are what fdisk -u expects
-# for these legacy DOS-partitioned USB drives.
 lbs='512'
 if [ -r "/sys/block/${diskbase##*/}/queue/logical_block_size" ]; then
-\tlbs="$(cat "/sys/block/${diskbase##*/}/queue/logical_block_size" 2>/dev/null)"
+	lbs="$(cat "/sys/block/${diskbase##*/}/queue/logical_block_size" 2>/dev/null)"
+fi
+if [ "${lbs}" != '512' ]; then
+	ewarn "Only 512-byte logical block devices are handled here."
+	return 0
 fi
 
 disk_sectors='0'
 if [ -r "/sys/block/${diskbase##*/}/size" ]; then
-\tdisk_sectors="$(cat "/sys/block/${diskbase##*/}/size" 2>/dev/null)"
+	disk_sectors="$(cat "/sys/block/${diskbase##*/}/size" 2>/dev/null)"
 fi
 case "${disk_sectors}" in
-\t''|*[!0-9]*) ;;
-\t*) ;;
-\t*)
-\tewarn "Could not read the size of ${diskbase}; skipping."
-\t\treturn 0
-\t;;
+	''|*[!0-9]*) ewarn "Could not read the size of ${diskbase}."; return 0 ;;
 esac
 
-# Partition start and end in sectors.
-part_first=0
-part_last=0
+part_first='0'
+part_last='0'
 if [ -r "/sys/block/${diskbase##*/}/${diskpart}/start" ]; then
-\tpart_first="$(cat "/sys/block/${diskbase##*/}/${diskpart}/start" 2>/dev/null)"
+	part_first="$(cat "/sys/block/${diskbase##*/}/${diskpart}/start" 2>/dev/null)"
 fi
 if [ -r "/sys/block/${diskbase##*/}/${diskpart}/size" ]; then
-\tpart_last="$(cat "/sys/block/${diskbase##*/}/${diskpart}/size" 2>/dev/null)"
+	part_last="$(cat "/sys/block/${diskbase##*/}/${diskpart}/size" 2>/dev/null)"
 fi
-
 if [ "${part_first}" -eq 0 ] || [ "${part_last}" -eq 0 ]; then
-\tewarn "Could not read partition geometry for ${target_dev}; skipping."
-\treturn 0
+	ewarn "Could not read partition geometry for ${target_dev}."
+	return 0
 fi
 part_last=$(( part_first + part_last - 1 ))
 
-# Convert to the fdisk -u sector unit only if the kernel and fdisk agree on sector
-# size. For USB drives in this project that is normally 512.
-unit_sectors="${lbs}"
-if [ "${unit_sectors}" != '512' ]; then
-\tewarn "This hook is written for 512-byte logical block devices; skipping ${diskbase}."
-\treturn 0
-fi
-
-disk_gb=$(( disk_sectors * unit_sectors / 1073741824 ))
-part_gb=$(( part_last * unit_sectors / 1073741824 ))
-unused_gb=$(( (disk_sectors - (part_last + 1)) * unit_sectors / 1073741824 ))
+disk_gb=$(( disk_sectors * 512 / 1073741824 ))
+part_gb=$(( part_last * 512 / 1073741824 ))
+unused_gb=$(( (disk_sectors - (part_last + 1)) * 512 / 1073741824 ))
 
 if [ "${unused_gb}" -le 0 ]; then
-\t# Partition already reaches the end of the disk.
-\treturn 0
+	return 0
 fi
 
-einfo "External PSXITARCH install detected on ${target_dev}."
+einfo "External PSXITARCH install on ${target_dev}."
 einfo "Disk: about ${disk_gb} GB. Partition: about ${part_gb} GB. Unused: about ${unused_gb} GB."
-
-eask "The disk is larger than the PSXITARCH partition. Do you wish to expand the partition to fill the disk? (yes/no): "
+eask "The disk is larger than the PSXITARCH partition. Expand the partition to fill the disk? (yes/no): "
 read answer
 case "${answer}" in
-\t[yY]*) ;;
-\t*) return 0 ;;
+	[yY]*) ;;
+	*) return 0 ;;
 esac
-
-eask "Expanding the partition will grow the ext4 filesystem to use the whole disk. Continue? (yes/no): "
+eask "This will grow the filesystem to use the whole disk. Continue? (yes/no): "
 read confirm
 case "${confirm}" in
-\t[yY]*) ;;
-\t*) return 0 ;;
+	[yY]*) ;;
+	*) return 0 ;;
 esac
 
-# Ensure the root partition is not in active use for the repartitioning step.
 if grep -q " ${target_dev} " /proc/mounts 2>/dev/null; then
-\tewarn "${target_dev} is currently mounted. Cannot safely repartition it."
-\treturn 1
+	ewarn "${target_dev} is currently mounted. Cannot safely repartition."
+	return 1
 fi
 
-# Recreate the single primary partition to span the whole disk.
-# DOS partition type 0x83 (Linux) is preserved here because that is what the
-# installers in this project use for the Linux partition.
 printf 'o\nn\np\n1\n%d\n%d\nw\n' "${part_first}" "${disk_sectors}" | fdisk -u "${diskbase}" >/dev/null 2>&1
-rc=$?
-if [ "${rc}" -ne 0 ]; then
-\teerror "fdisk failed on ${diskbase}."
-\treturn 1
+if [ $? -ne 0 ]; then
+	teerror "fdisk failed on ${diskbase}."
+	return 1
 fi
 
-# Ask the kernel to re-read the partition table.
 if ! blockdev --rereadpt "${diskbase}" 2>/dev/null; then
-\t# partprobe may be available where blockdev's reread is not enough.
-\tif command -v partprobe >/dev/null 2>&1; then
-\t\tif ! partprobe "${diskbase}" 2>/dev/null; then
-\t\t\tewarn "partprobe also failed; you may need to reboot for the new partitions to appear."
-\t\tfi
-\telse
-\t\tewarn "Could not re-read the partition table on ${diskbase}."
-\t\treturn 1
-\tfi
+	if command -v partprobe >/dev/null 2>&1; then
+		partprobe "${diskbase}" 2>/dev/null || ewarn "partprobe failed; a reboot may be needed."
+	else
+		ewarn "Could not re-read the partition table on ${diskbase}."
+		return 1
+	fi
 fi
 
 newname="${diskbase}1"
 n=0
 while ! [ -b "${newname}" ]; do
-\tn=$((n + 1))
-\tif [ "${n}" -gt 10 ]; then
-\t\teerror "Partition ${newname} did not reappear after repartitioning ${diskbase}."
-\t\treturn 1
-\tfi
-\tsleep 1
+	n=$((n + 1))
+	if [ "${n}" -gt 10 ]; then
+		teerror "Partition ${newname} did not reappear."
+		return 1
+	fi
+	sleep 1
 done
 
-# Grow the ext4 filesystem on the expanded partition.
-if ! e2fsck -f "${newname}"; then
-\tewarn "e2fsck reported issues on ${newname}; the filesystem may need attention."
-fi
-if ! resize2fs "${newname}"; then
-\teerror "Could not resize the ext4 filesystem on ${newname}."
-\treturn 1
+fs_type=''
+case "$(blkid -o value -s TYPE "${newname}" 2>/dev/null)" in
+	ext2*|ext4*) fs_type='ext4' ;;
+	btrfs*) fs_type='btrfs' ;;
+esac
+
+if [ "${fs_type}" = 'ext4' ]; then
+	if ! e2fsck -f "${newname}"; then
+		tewarn "e2fsck reported issues on ${newname}."
+	fi
+	if ! resize2fs "${newname}"; then
+		teerror "Could not resize the ext4 filesystem on ${newname}."
+		return 1
+	fi
+else
+	if ! btrfs check "${newname}"; then
+		tewarn "btrfs check reported issues on ${newname}."
+	fi
+	if ! mount -o ro "${newname}" /mnt 2>/dev/null; then
+		mkdir -p /mnt
+		if ! mount -o ro "${newname}" /mnt 2>/dev/null; then
+			teerror "Could not mount ${newname} to resize btrfs."
+			return 1
+		fi
+	fi
+	if ! btrfs filesystem resize max /mnt; then
+		teerror "Could not resize the btrfs filesystem on ${newname}."
+		umount /mnt 2>/dev/null
+		return 1
+	fi
+	umount /mnt 2>/dev/null
 fi
 
 einfo "Expanded ${target_dev} to fill ${diskbase} (about ${disk_gb} GB)."

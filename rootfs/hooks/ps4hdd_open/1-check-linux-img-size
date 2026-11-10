@@ -1,75 +1,91 @@
 #!/bin/sh
 
-# Check /ps4hdd/app/linux.img and offer to resize it if it is smaller than 10 GB.
-# The image is an ext4 filesystem stored directly in the .img file (no partition layer).
-
 img=/ps4hdd/app/linux.img
 limit_gb=10
 
 if [ ! -f "${img}" ]; then
-\t# Nothing to check — the image is not present.
-\treturn 0
+	return 0
 fi
 
 current_bytes='0'
 case "$(stat -c %s "${img}" 2>/dev/null)" in
-\t''|*[!0-9]*) ;;
-\t*) current_bytes="${_}" ;;
+	''|*[!0-9]*) ;;
+	*) current_bytes="${_}" ;;
 esac
 
 if [ "${current_bytes}" -eq 0 ]; then
-\tewarn "Could not determine the size of ${img}; skipping resize check."
-\treturn 0
+	ewarn "Could not determine the size of ${img}; skipping."
+	return 0
 fi
 
 current_gb=$(( current_bytes / 1073741824 ))
 
 if [ "${current_gb}" -ge "${limit_gb}" ]; then
-\t# Already at least 10 GB; nothing to do.
-\treturn 0
+	return 0
 fi
 
-einfo "The Linux image (${img}) is currently about ${current_gb} GB."
+einfo "The Linux image ${img} is currently about ${current_gb} GB."
 eask "It is smaller than ${limit_gb} GB. Do you wish to resize it? (yes/no): "
 read answer
 case "${answer}" in
-\t[yY]*) ;;
-\t*) return 0 ;;
+	[yY]*) ;;
+	*) return 0 ;;
 esac
 
-eask "Enter the new size in GB (must be at least ${current_gb} GB): "
+eask "Enter the new size in GB (at least ${current_gb}): "
 read size
 case "${size}" in
-\t''|*[!0-9]*)
-\t\teerror "'${size}' is not a number."
-\t\treturn 1
-\t;;
+	''|*[!0-9]*)
+		teerror "'${size}' is not a number."
+		return 1
+	;;
 esac
 if [ "${size}" -lt "${current_gb}" ]; then
-\teerror "New size must be at least the current size (${current_gb} GB)."
-\treturn 1
+	teerror "New size must be at least the current size (${current_gb} GB)."
+	return 1
 fi
 
 new_bytes=$(( size * 1073741824 ))
 if [ "${new_bytes}" -eq "${current_bytes}" ]; then
-\teinfo "No change requested."
-\treturn 0
+	einfo "No change requested."
+	return 0
 fi
 
-# Sparse-grow the file to the new size with truncate.
 if ! truncate -s "${new_bytes}" "${img}"; then
-\teerror "Could not resize ${img}."
-\treturn 1
+	teerror "Could not resize ${img}."
+	return 1
 fi
 
-# Shrink/grow the ext4 filesystem to fill the new file size.
-# e2fsck -f is required before resize2fs for some size changes.
-if ! e2fsck -f "${img}"; then
-\tewarn "e2fsck reported issues on ${img}; the filesystem may need attention."
-fi
-if ! resize2fs "${img}" "${new_bytes}"; then
-\teerror "Could not resize the ext4 filesystem inside ${img}."
-\treturn 1
+fs_type=''
+case "$(blkid -o value -s TYPE "${img}" 2>/dev/null)" in
+	ext2*|ext4*) fs_type='ext4' ;;
+	btrfs*) fs_type='btrfs' ;;
+esac
+
+if [ "${fs_type}" = 'ext4' ]; then
+	if ! e2fsck -f "${img}"; then
+		tewarn "e2fsck reported issues on ${img}."
+	fi
+	if ! resize2fs "${img}" "${new_bytes}"; then
+		teerror "Could not resize the ext4 filesystem in ${img}."
+		return 1
+	fi
+else
+	if ! btrfs check "${img}"; then
+		tewarn "btrfs check reported issues on ${img}."
+	fi
+	if ! mount -o loop,ro "${img}" /mnt 2>/dev/null; then
+		if ! mkdir -p /mnt && mount -o loop,ro "${img}" /mnt 2>/dev/null; then
+			teerror "Could not mount ${img} to resize btrfs."
+			return 1
+		fi
+	fi
+	if ! btrfs filesystem resize "${new_bytes}" /mnt; then
+		teerror "Could not resize the btrfs filesystem in ${img}."
+		umount /mnt 2>/dev/null
+		return 1
+	fi
+	umount /mnt 2>/dev/null
 fi
 
 einfo "Resized ${img} to ${size} GB."
