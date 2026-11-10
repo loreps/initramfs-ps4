@@ -57,7 +57,7 @@ ver="$(cat /VERSION)"
 hash="$(cat /GIT_HASH)"
 # figure out southbridge
 sb="$(ps4_southbridge)"
-einfo "initramfs-ps4 loreps fork ${ver}-git-${hash}. Linux kernel ${kernelver}."
+einfo "initramfs-ps4 loreps fork ${ver}-git-${hash}. Linux kernel: ${kernelver}."
 
 # Disable kernel messages from popping onto the screen
 echo 0 > /proc/sys/kernel/printk
