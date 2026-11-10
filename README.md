@@ -1,4 +1,4 @@
-# initramfs-ps4
+# IT WORKS initramfs-ps4
  Custom Initramfs for PS4. (based on better-initramfs)
 
 # Features:
@@ -16,7 +16,7 @@ The source tree is split into `rootfs/` (the files packed into the initramfs), `
 
 The PS4 loader must add `/key/eap_hdd_key.bin` to the initramfs. The internal drive can not be opened without it.
 
-...Or download from releases https://git.gay/GayCorp/initramfs-ps4/releases
+...Or download from releases
 
 # Bootargs
 
