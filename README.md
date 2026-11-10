@@ -30,6 +30,8 @@ options for initramfs in bootargs.txt:
 
 `noboot` - prevents auto booting into system
 
+`ssh` - auto uses `setupnet` and initiates SSH. (root@ip)
+
 format:
 
 `initramfs=option1,option2,etc...`

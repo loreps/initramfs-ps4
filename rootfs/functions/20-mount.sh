@@ -87,6 +87,15 @@ emount() {
 				einfo "Mounting /sys..."
 				run mount -t sysfs sysfs /sys
 			;;
+			'/dev/pts')
+				if ! mountpoint -q '/dev/pts'; then
+					einfo "Mounting /dev/pts (devpts)..."
+					run mkdir -p /dev/pts
+					run mount -t devpts -o nosuid,noexec,relatime devpts /dev/pts
+				else
+					einfo "/dev/pts already mounted, skipping..."
+				fi
+			;;
 			*) eerror "emount() does not understand \"$1\"" ;;
 		esac
 		shift
