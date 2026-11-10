@@ -13,7 +13,7 @@ ps4_wait_disks() {
 }
 
 ps4_fsck() {
-	ewarn " skipping auto-fsck " 
+	ewarn "skipping auto-fsck" 
 }
 
 ps4_release_image() {
