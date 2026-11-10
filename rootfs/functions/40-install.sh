@@ -37,8 +37,14 @@ ps4_release_image() {
 	done
 	[ -z "${failed}" ] || return 1
 }
-
 ps4_find_install() {
+	if has_cmdline "swap-int"; then
+		ps4_mount_int_swap
+	else
+		ps4_locate_install
+	fi
+}
+ps4_locate_install() {
 	if mountpoint -q /newroot && ! umount /newroot; then
 		eerror "/newroot is busy, can not search again."
 		return 1
@@ -64,7 +70,27 @@ ps4_find_install() {
 	ewarn "No installation found on internal drive either."
 	return 1
 }
+ps4_mount_int_swap() {
+	einfo "Please disconnect the Internal Storage from the SATA connector and connect your Linux installation drive to the same SATA connector. Ensure the drive is properly secured before continuing."
+	eask "Press Enter when ready."
+	read _dummy
 
+	einfo "Waiting for SATA drive detection..."
+
+	while [ ! -b /dev/sda ]; do
+		sleep 1
+	done
+
+	einfo "Checking detected drive..."
+
+	while [ -b /dev/sda27 ]; do
+		sleep 1
+	done
+
+	einfo "Mounting Linux installation..."
+	mkdir -p /newroot
+	mount /dev/sda1 /newroot
+}
 ps4_prepare_newroot() {
 	local d
 	kernel_msg_lvl 7 "Creating standard directories in /newroot"
