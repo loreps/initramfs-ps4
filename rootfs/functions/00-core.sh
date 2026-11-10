@@ -84,6 +84,34 @@ SetupNetwork() {
 	return 1
 }
 
+ps4_start_ssh() {
+	einfo "Starting SSH server..."
+
+	SetupNetwork || {
+		eerror "Network initialization failed."
+		return 1
+	}
+
+	dodir /etc/dropbear /var/run
+
+	# Create a minimal root account.
+	if ! grep -q '^root:' /etc/passwd 2>/dev/null; then
+		echo 'root::0:0:root:/:/bin/sh' >> /etc/passwd
+	fi
+
+	# Generate a temporary host key.
+	/bin/dropbearkey -t ed25519 \
+		-f /etc/dropbear/dropbear_ed25519_host_key || return 1
+
+	# Allow blank-password authentication.
+	/bin/dropbear \
+		-B \
+		-r /etc/dropbear/dropbear_ed25519_host_key \
+		-P /var/run/dropbear.pid
+
+	einfo "SSH server started."
+}
+
 rescueshell() {
 	initramfs_quiet=false
 	if [ "$rescueshell" != 'true' ]; then
