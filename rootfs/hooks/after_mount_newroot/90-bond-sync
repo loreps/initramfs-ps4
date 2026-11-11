@@ -1,0 +1,13 @@
+bond_capture=/bt_bonds.bin
+bond_sync=/bin/bond-sync
+
+if [ -r "$bond_capture" ] && [ -x "$bond_sync" ] && "$bond_sync" --check "$bond_capture"; then
+    bond_attempt=0
+    while [ "$bond_attempt" -lt 8 ]; do
+        "$bond_sync" "$bond_capture" /newroot && break
+        sleep 1
+        bond_attempt=$((bond_attempt + 1))
+    done
+fi
+
+unset bond_capture bond_sync bond_attempt
