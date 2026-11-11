@@ -1,6 +1,0 @@
-#!/bin/sh
-. /functions/00-core.sh
-
-einfo "Formatting Orbis Swap as a Linux swap partition..."
-mkswap /dev/sda31 > /dev/null
-einfo "Done!"

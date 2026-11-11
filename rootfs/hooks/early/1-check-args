@@ -11,3 +11,8 @@ fi
 if has_cmdline "quiet"; then
 	initramfs_quiet=true
 fi
+if has_cmdline "format-swap"; then
+	einfo "Formatting Orbis Swap as a Linux swap partition..."
+	mkswap /dev/sda31 > /dev/null
+	einfo "Done!"
+fi
