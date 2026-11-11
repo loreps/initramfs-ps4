@@ -32,6 +32,8 @@ options for initramfs in bootargs.txt:
 
 `ssh` - auto uses `setupnet` and initiates SSH. (root@ip)
 
+'format-swap' - formats `/dev/sda31` as swap.
+
 format:
 
 `initramfs=option1,option2,etc...`

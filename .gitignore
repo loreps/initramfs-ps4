@@ -7,3 +7,5 @@ rootfs/lib/firmware/mrvl/*
 rootfs/GIT_HASH
 scripts/boot*
 assets/vmlinuz-linux
+rootfs/bin/bond-sync
+rootfs/bin/reboot

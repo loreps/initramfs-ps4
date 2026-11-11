@@ -18,6 +18,23 @@ for arg in "$@"; do
     esac
 done
 
+
+# Build all source components.
+if [ -d "${ROOT}/src" ]; then
+    find "${ROOT}/src" -type f -name Makefile -print |
+    while IFS= read -r makefile; do
+        component="$(dirname "$makefile")"
+
+        echo "Cleaning ${component#"$ROOT"/}..."
+        make -C "$component" clean
+
+        echo "Building ${component#"$ROOT"/}..."
+        make -C "$component"
+    done
+fi
+
+
+
 mkdir -p "${ROOT}/dist"
 rm -f "$OUT"
 
